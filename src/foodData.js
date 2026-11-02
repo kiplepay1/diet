@@ -1,0 +1,30 @@
+export const FOOD_LIBRARY = [
+  { id:"roti-canai", name:"Roti canai", category:"Mamak", serving:"1 piece", calories:300, protein:6, carbs:42, fat:12, price:2.0 },
+  { id:"roti-telur", name:"Roti telur", category:"Mamak", serving:"1 piece", calories:380, protein:13, carbs:43, fat:17, price:3.5 },
+  { id:"thosai", name:"Thosai + dhal", category:"Mamak", serving:"1 set", calories:230, protein:8, carbs:38, fat:5, price:3.5 },
+  { id:"chapati", name:"Chapati", category:"Mamak", serving:"1 piece", calories:180, protein:5, carbs:30, fat:4, price:2.5 },
+  { id:"nasi-kandar", name:"Nasi kandar ayam", category:"Mamak", serving:"1 plate", calories:750, protein:30, carbs:90, fat:28, price:9 },
+  { id:"mee-goreng", name:"Mee goreng mamak", category:"Mamak", serving:"1 plate", calories:620, protein:16, carbs:85, fat:23, price:7 },
+  { id:"maggi-goreng", name:"Maggi goreng", category:"Mamak", serving:"1 plate", calories:600, protein:14, carbs:78, fat:24, price:7 },
+  { id:"nasi-ayam", name:"Nasi ayam", category:"Malay", serving:"1 plate", calories:550, protein:28, carbs:72, fat:16, price:8 },
+  { id:"nasi-lemak", name:"Nasi lemak biasa", category:"Malay", serving:"1 packet", calories:450, protein:12, carbs:55, fat:20, price:3.5 },
+  { id:"nasi-campur", name:"Nasi campur (rice + 1 lauk + veg)", category:"Malay", serving:"1 plate", calories:600, protein:25, carbs:75, fat:20, price:8 },
+  { id:"ayam-kicap", name:"Ayam masak kicap", category:"Malay", serving:"1 medium piece", calories:230, protein:25, carbs:8, fat:10, price:4 },
+  { id:"ayam-goreng", name:"Ayam goreng", category:"Malay", serving:"1 medium piece", calories:280, protein:25, carbs:8, fat:16, price:4 },
+  { id:"ikan-bakar", name:"Ikan bakar", category:"Malay", serving:"1 medium piece", calories:220, protein:32, carbs:2, fat:9, price:6 },
+  { id:"sup-ayam", name:"Sup ayam", category:"Malay", serving:"1 bowl", calories:220, protein:25, carbs:8, fat:9, price:6 },
+  { id:"rice", name:"White rice", category:"Home cooking", serving:"1 cup cooked", calories:205, protein:4, carbs:45, fat:0.5, price:0.6 },
+  { id:"egg", name:"Boiled egg", category:"Home cooking", serving:"1 egg", calories:78, protein:6, carbs:1, fat:5, price:0.7 },
+  { id:"tofu", name:"Tofu", category:"Home cooking", serving:"100 g", calories:80, protein:8, carbs:2, fat:5, price:1.2 },
+  { id:"sardine", name:"Sardines (canned)", category:"Home cooking", serving:"1/2 can", calories:170, protein:19, carbs:3, fat:9, price:2.5 },
+  { id:"oats", name:"Oats with low-fat milk", category:"Breakfast", serving:"1 bowl", calories:250, protein:12, carbs:38, fat:6, price:2.5 },
+  { id:"bread-egg", name:"Wholemeal bread + 2 eggs", category:"Breakfast", serving:"2 slices + 2 eggs", calories:300, protein:19, carbs:26, fat:13, price:2.5 },
+  { id:"banana", name:"Banana", category:"Fruit & snacks", serving:"1 medium", calories:105, protein:1, carbs:27, fat:0.4, price:0.8 },
+  { id:"apple", name:"Apple", category:"Fruit & snacks", serving:"1 medium", calories:95, protein:0.5, carbs:25, fat:0.3, price:1.5 },
+  { id:"teh-tarik", name:"Teh tarik", category:"Drinks", serving:"1 glass", calories:160, protein:5, carbs:24, fat:5, price:2.5 },
+  { id:"teh-o-ais", name:"Teh O ais", category:"Drinks", serving:"1 glass", calories:90, protein:0, carbs:22, fat:0, price:2 },
+  { id:"kopi-o", name:"Kopi O kosong", category:"Drinks", serving:"1 cup", calories:5, protein:0, carbs:1, fat:0, price:1.5 },
+  { id:"water", name:"Plain water", category:"Drinks", serving:"1 glass", calories:0, protein:0, carbs:0, fat:0, price:0 }
+];
+
+export const MEALS = ["Breakfast", "Lunch", "Tea time", "Dinner", "Supper"];
