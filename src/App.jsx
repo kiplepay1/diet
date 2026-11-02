@@ -218,7 +218,7 @@ function App() {
 
     <main className="main-content">
       <header className="topbar"><div><span className="eyebrow">MONDAY, YOUR HEALTH JOURNEY</span><h2>{page==="Home"?"Your daily overview":page}</h2></div>
-        <div className="top-actions"><span className="date-pill">{new Date().toLocaleDateString("en-MY",{day:"numeric",month:"short",year:"numeric"})}</span><button className="avatar" onClick={()=>setProfileOpen(true)}>{(profile.name||user.email||"M").charAt(0).toUpperCase()}</button></div>
+        <div className="top-actions"><span className="date-pill">{new Date().toLocaleDateString("en-MY",{day:"numeric",month:"short",year:"numeric"})}</span><button className="avatar" onClick={()=>setProfileOpen(true)}>{(profile.name||user?.email || "Guest").charAt(0).toUpperCase()}</button></div>
       </header>
 
       {page==="Home" && <div className="page-stack">
