@@ -1,30 +1,34 @@
-# MyDiet — Malaysian Food & Weight Tracker
+# MyDiet — Malaysian Guided Meal Planner
 
-A responsive React + Vite starter app for tracking Malaysian meals, calories, protein, food spending and weight.
+MyDiet is a React + Vite app focused on guided, affordable everyday Malaysian meals. It is designed around mamak, Malay and simple home-cooked food rather than requiring users to invent their own diet plan.
 
-## Included in this MVP
+## What's included
 
-- Responsive dashboard for desktop and mobile
-- Email/password Firebase Authentication
-- Firestore food diary and weight history
-- Firebase Storage food photo uploads
-- Manual food logging with editable calories, protein, quantity and cost
-- Starter Malaysian food library (mamak, Malay, home cooking, breakfast, drinks, snacks)
-- Daily calorie, protein and food budget summaries
-- Starter rule-based meal advisor
-- Body profile and estimated calorie/protein targets
-- Demo mode for trying the app before connecting Firebase
+- Guided daily meal plan for breakfast, lunch, tea time and dinner
+- Estimated daily calorie target from age, sex, height, weight and activity level
+- Meal calorie allocation: 25% breakfast, 35% lunch, 10% tea time, 30% dinner
+- Affordable mamak, Malay and home-style meal suggestions with estimated calories, protein and RM cost
+- Preference for a mix of food, mamak or Malay food
+- Change-menu action to rotate suggestions
+- One-tap logging of a suggested meal into the food diary
+- Browser meal-time reminders with editable times
+- Food diary, food library, weight history and budget tracking
+- Firebase email/password authentication, Firestore sync and optional photo upload
+- Demo mode using browser local storage
+- GitHub Pages Actions workflow and repository-aware Vite base path
 
-## Important limitations
+## Important behaviour and limitations
 
-- Food photos are uploaded and attached to a food log, but this version does **not** automatically recognise food or calculate nutrition from an image.
-- The advisor is a transparent rule-based starter, not a connected generative AI service.
-- Food calories, protein and prices are estimates. Actual serving size, recipe, cooking oil, gravy and local prices vary.
-- The calorie calculation is an estimate, not medical advice. Discuss weight-loss targets with a qualified health professional if you have a medical condition, are pregnant, have a history of disordered eating, or need a therapeutic diet.
+- Meal plans are practical suggestions, not compulsory restrictions. Users should be able to swap a meal or log what they actually ate.
+- Calories, protein and prices are estimates. Restaurant recipes, portion sizes, oil and gravy vary.
+- Browser reminders currently work while the MyDiet page is open. Notifications when the browser is fully closed require Firebase Cloud Messaging (FCM), a service worker and push configuration; that is not included in this version.
+- Food photos are attached to diary entries; automatic food recognition and image-based calorie estimation are not included.
+- The meal planner is a deterministic starter planner, not a live AI nutrition service.
+- Calorie estimates are not medical advice. Users with medical conditions, pregnancy, a history of disordered eating or therapeutic diet needs should consult a qualified health professional.
 
-## 1. Run locally
+## Run locally
 
-Install Node.js 20 LTS or later.
+Use Node.js 20 LTS or later:
 
 ```bash
 npm install
@@ -32,75 +36,46 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Open the local URL printed by Vite.
+The app starts in demo mode if Firebase settings are not configured. Demo data stays in the current browser.
 
-By default, `.env.example` has `VITE_DEMO_MODE=true`. The app will run without Firebase and save demo records in this browser's local storage. Demo data is not cloud-synced.
+## Firebase setup
 
-## 2. Connect Firebase
+1. Create or open a project at https://console.firebase.google.com/.
+2. Add a Web app in Project settings and copy its Firebase web config.
+3. Copy `.env.example` to `.env.local` and enter the matching `VITE_FIREBASE_*` values.
+4. Set `VITE_DEMO_MODE=false`.
+5. Enable Email/Password under Authentication > Sign-in method.
+6. Create Firestore and Storage.
+7. Publish `firestore.rules` and `storage.rules`.
+8. Add the deployed GitHub Pages domain under Authentication > Settings > Authorized domains.
 
-1. Open https://console.firebase.google.com/
-2. Create a Firebase project (or use your existing project).
-3. In Project settings > General > Your apps, add a Web app.
-4. Copy the Firebase web configuration values.
-5. In the project folder, copy `.env.example` to `.env.local`.
-6. Paste the values into the matching `VITE_FIREBASE_*` fields.
-7. Change `VITE_DEMO_MODE=true` to `VITE_DEMO_MODE=false`.
-8. In Firebase Authentication > Sign-in method, enable **Email/Password**.
-9. Create a Firestore database.
-10. In Firebase Storage, get started and create a bucket.
-11. In Firestore Rules, paste the contents of `firestore.rules` and publish.
-12. In Storage Rules, paste the contents of `storage.rules` and publish.
-13. Restart the dev server after editing `.env.local`.
+Do not commit `.env.local` or private service-account keys.
 
-Never commit `.env.local` to GitHub. It is ignored by `.gitignore`. Firebase web config is intended for client apps, but database and storage security rules are essential. Do not put private service-account keys or AI API keys in frontend environment variables.
+## Deploy to GitHub Pages
 
-## 3. Push to GitHub
+1. Upload the contents of this project folder to the root of your GitHub repository (so `package.json`, `index.html`, `src/` and `.github/` are at repository root).
+2. Ensure your default branch is named `main`. If not, edit `.github/workflows/deploy.yml` and change the branch under `on.push.branches`.
+3. In GitHub repository Settings > Pages, set Build and deployment Source to **GitHub Actions**.
+4. If you want Firebase cloud login and sync, open Settings > Secrets and variables > Actions > New repository secret. Add these six secrets using the exact names: `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_STORAGE_BUCKET`, `VITE_FIREBASE_MESSAGING_SENDER_ID`, and `VITE_FIREBASE_APP_ID`. Copy each value from Firebase Project settings > Your apps > Web app. Without these secrets, the app falls back to browser-only demo mode.
+5. Open the Actions tab and wait for **Deploy MyDiet to GitHub Pages** to finish successfully.
+6. Open the Pages URL shown in the workflow deployment and refresh the page.
 
-Create a new empty GitHub repository, then run these commands in the project folder:
+The workflow calculates the correct Vite base path from the repository name, including the special `username.github.io` user-site case.
 
-```bash
-git init
-git add .
-git commit -m "Initial MyDiet app"
-git branch -M main
-git remote add origin https://github.com/YOUR_USERNAME/YOUR_REPOSITORY.git
-git push -u origin main
-```
-
-Replace the remote URL with your own repository URL.
-
-## 4. Deploy with Vercel
-
-1. Sign in to https://vercel.com/ using GitHub.
-2. Import this repository.
-3. Framework preset: **Vite**.
-4. Add the same `VITE_FIREBASE_*` values under Project Settings > Environment Variables.
-5. Deploy.
-6. In Firebase Authentication > Settings > Authorized domains, add your deployed domain (for example `your-project.vercel.app`).
-
-Alternatively, deploy the `dist` folder to Firebase Hosting after running `npm run build`.
-
-## 5. Build for production
+## Production build
 
 ```bash
+npm install
 npm run build
 npm run preview
 ```
 
-Vite outputs the production application into `dist/`.
+Vite writes the compiled site to `dist/`.
 
 ## Firestore data model
 
-- `users/{uid}` — profile and calculated targets
-- `food_logs/{autoId}` — date, meal, food, portion, calories, protein, cost, source, optional photo URL
+- `users/{uid}` — profile and estimated calorie/protein targets
+- `food_logs/{autoId}` — date, meal, food, portion, calories, protein, cost, source and optional photo URL
 - `weight_logs/{autoId}` — date and weight
 
-Food library is currently bundled in `src/foodData.js` so the app works immediately. It can later be migrated to Firestore if you want to manage food entries without redeploying.
-
-## Suggested next upgrades
-
-1. AI food-photo analysis through a secure Firebase Cloud Function or other backend. Do not call a paid AI API directly from browser code or expose its secret key.
-2. Food library management screen and custom food creation.
-3. Weekly meal plan generator with actual local price inputs.
-4. Export diary to CSV and edit existing diary entries.
-5. More precise portion references and verified Malaysian nutrition data.
+Food options and meal-plan options are bundled locally in `src/foodData.js` and `src/mealPlanner.js`.
