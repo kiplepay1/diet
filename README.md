@@ -4,7 +4,8 @@ MyDiet is a React + Vite app focused on guided, affordable everyday Malaysian me
 
 ## What's included
 
-- Guided daily meal plan for breakfast, lunch, tea time and dinner
+- Structured 30-day or 60-day guided meal programme with a day counter and restart option
+- Assigned daily meals for breakfast, lunch, tea time and dinner, rotating through Malaysian meal choices across programme days
 - Estimated daily calorie target from age, sex, height, weight and activity level
 - Meal calorie allocation: 25% breakfast, 35% lunch, 10% tea time, 30% dinner
 - Affordable mamak, Malay and home-style meal suggestions with estimated calories, protein and RM cost

@@ -325,7 +325,17 @@ function App() {
           </div>
           <div className="panel advisor-card"><div className="advisor-icon"><Sparkles/></div><p className="eyebrow">A LITTLE GUIDANCE</p><h3>Make your next meal count.</h3><p className="muted">Get simple meal ideas based on your remaining calories and RM{budget} daily budget.</p><button className="primary full" onClick={()=>setPage("AI advisor")}>Ask MyDiet advisor <Sparkles size={16}/></button><div className="tip"><b>Remember</b><p>Try to include a protein source and vegetables in your main meals. You don't need to skip meals to lose weight.</p></div></div>
         </section>
-        <section className="quick-actions"><button onClick={()=>setShowLog(true)}><Plus/>Log a meal</button><button onClick={()=>setPage("Food library")}><Search/>Find Malaysian food</button><button onClick={()=>setPage("Progress")}><TrendingDown/>Track weight</button></section>
+        <section className="home-shortcuts-section">
+          <div className="home-shortcuts-heading"><div><p className="eyebrow">QUICK ACCESS</p><h3>Where would you like to go?</h3><p className="muted">All MyDiet features are one tap away.</p></div></div>
+          <div className="home-shortcuts">
+            <button className="shortcut-card" onClick={()=>setPage("Meal plan")}><span className="shortcut-icon green"><ChefHat size={21}/></span><span className="shortcut-copy"><b>Meal plan</b><small>See today's suggested meals</small></span><span className="shortcut-arrow">›</span></button>
+            <button className="shortcut-card" onClick={()=>setPage("Diary")}><span className="shortcut-icon peach"><Utensils size={21}/></span><span className="shortcut-copy"><b>Food diary</b><small>Review meals and calories</small></span><span className="shortcut-arrow">›</span></button>
+            <button className="shortcut-card" onClick={()=>setPage("Food library")}><span className="shortcut-icon yellow"><Apple size={21}/></span><span className="shortcut-copy"><b>Food library</b><small>Find and log Malaysian food</small></span><span className="shortcut-arrow">›</span></button>
+            <button className="shortcut-card" onClick={()=>setPage("AI advisor")}><span className="shortcut-icon purple"><Sparkles size={21}/></span><span className="shortcut-copy"><b>MyDiet advisor</b><small>Get practical food suggestions</small></span><span className="shortcut-arrow">›</span></button>
+            <button className="shortcut-card" onClick={()=>setPage("Progress")}><span className="shortcut-icon blue"><ChartNoAxesCombined size={21}/></span><span className="shortcut-copy"><b>My progress</b><small>Track your weight journey</small></span><span className="shortcut-arrow">›</span></button>
+            <button className="shortcut-card" onClick={()=>setProfileOpen(true)}><span className="shortcut-icon grey"><Settings size={21}/></span><span className="shortcut-copy"><b>Profile & settings</b><small>Update goals and preferences</small></span><span className="shortcut-arrow">›</span></button>
+          </div>
+        </section>
       </div>}
 
       {page==="Meal plan" && <div className="page-stack">
