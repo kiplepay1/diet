@@ -41,6 +41,7 @@ function App() {
   const [category, setCategory] = useState("All");
   const [showLog, setShowLog] = useState(false);
   const [selectedFood, setSelectedFood] = useState(null);
+  const [foodQuery, setFoodQuery] = useState("");
   const [meal, setMeal] = useState("Lunch");
   const [quantity, setQuantity] = useState(1);
   const [cost, setCost] = useState("");
@@ -145,6 +146,7 @@ function App() {
   async function addFoodLog(e) {
     e.preventDefault();
     if (!selectedFood) return;
+    if (customCalories === "" || !Number.isFinite(Number(customCalories)) || Number(customCalories) < 0) { notify("Please enter a valid calorie estimate for this food."); return; }
     const q = Math.max(0.25, Number(quantity) || 1);
     const entry = {
       userId:user.uid, date:today(), mealType:meal, foodId:selectedFood.id || "custom",
@@ -167,7 +169,7 @@ function App() {
   }
 
   function resetLog() {
-    setSelectedFood(null); setQuantity(1); setCost(""); setCustomCalories(""); setCustomProtein("");
+    setSelectedFood(null); setFoodQuery(""); setQuantity(1); setCost(""); setCustomCalories(""); setCustomProtein("");
     setPhoto(null); setPhotoPreview("");
   }
 
@@ -218,6 +220,29 @@ function App() {
       else await addDoc(collection(db, "food_logs"), entry);
       notify(`${item.label} added to your food diary.`);
     } catch (err) { notify(`Could not save meal: ${err.message}`); }
+  }
+
+  const foodMatches = foodQuery.trim().length < 2 ? [] : FOOD_LIBRARY.filter(f => {
+    const query = foodQuery.toLowerCase().trim();
+    const name = f.name.toLowerCase();
+    const aliases = { "chicken rice":"nasi ayam", "nasi ayam":"nasi ayam", "fried chicken":"ayam goreng", "fried rice":"nasi goreng", "white rice":"white rice", "boiled egg":"boiled egg", "roti telur":"roti telur" };
+    const alias = aliases[query];
+    return name.includes(query) || query.split(/\s+/).every(word => name.includes(word)) || Boolean(alias && name.includes(alias));
+  }).slice(0, 6);
+
+  function chooseFood(f) {
+    setSelectedFood(f);
+    setFoodQuery(f.name);
+    setCustomCalories(String(f.calories));
+    setCustomProtein(String(f.protein));
+    setCost(String(f.price));
+  }
+
+  function useCustomFood() {
+    const name = foodQuery.trim();
+    if (!name) return;
+    setSelectedFood({ id:"custom", name, category:"Custom", serving:"1 serving", calories:0, protein:0, price:0 });
+    setCustomCalories(""); setCustomProtein(""); setCost("");
   }
 
   const filteredFoods = FOOD_LIBRARY.filter(f =>
@@ -348,14 +373,19 @@ function App() {
     {showLog && <div className="modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget){setShowLog(false);resetLog()}}}><div className="modal"><div className="modal-heading"><div><p className="eyebrow">FOOD DIARY</p><h2>Add food</h2></div><button className="icon-button" onClick={()=>{setShowLog(false);resetLog()}}><X/></button></div>
       <form onSubmit={addFoodLog} className="stack">
         <label>Meal<select value={meal} onChange={e=>setMeal(e.target.value)}>{MEALS.map(m=><option key={m}>{m}</option>)}</select></label>
-        <label>Food<select value={selectedFood?.id||""} onChange={e=>{const f=FOOD_LIBRARY.find(x=>x.id===e.target.value);setSelectedFood(f||null);if(f){setCustomCalories(String(f.calories));setCustomProtein(String(f.protein));setCost(String(f.price))}}}><option value="">Choose a food...</option>{FOOD_LIBRARY.map(f=><option key={f.id} value={f.id}>{f.name} — {f.calories} kcal</option>)}</select></label>
-        {selectedFood && <div className="selected-food"><b>{selectedFood.name}</b><span>{selectedFood.serving}</span></div>}
+        <label>What did you eat? <input type="text" value={foodQuery} onChange={e=>{setFoodQuery(e.target.value);setSelectedFood(null);setCustomCalories("");setCustomProtein("");setCost("")}} placeholder="Type e.g. nasi lemak, roti canai, chicken rice" autoComplete="off" /></label>
+        {foodQuery.trim().length >= 2 && !selectedFood && <div className="food-match-list">
+          {foodMatches.length > 0 ? foodMatches.map(f=><button type="button" className="food-match" key={f.id} onClick={()=>chooseFood(f)}><span><b>{f.name}</b><small>{f.serving}</small></span><strong>{f.calories} kcal</strong></button>) : <p className="footnote">No close match in the Malaysian food library.</p>}
+          <button type="button" className="secondary full" onClick={useCustomFood}>Use “{foodQuery.trim()}” as a custom food</button>
+        </div>}
+        {selectedFood && <div className="selected-food"><b>{selectedFood.name}</b><span>{selectedFood.serving} · {selectedFood.id === "custom" ? "Custom estimate" : "Matched from food library"}</span></div>}
         <div className="form-two"><label>Quantity<input type="number" min="0.25" step="0.25" value={quantity} onChange={e=>setQuantity(e.target.value)}/></label><label>Cost (RM)<input type="number" min="0" step="0.10" value={cost} onChange={e=>setCost(e.target.value)} placeholder="e.g. 5.00"/></label></div>
         <div className="form-two"><label>Calories per serving<input type="number" min="0" value={customCalories} onChange={e=>setCustomCalories(e.target.value)} placeholder="kcal"/></label><label>Protein per serving (g)<input type="number" min="0" value={customProtein} onChange={e=>setCustomProtein(e.target.value)} placeholder="grams"/></label></div>
         <label className="upload-label"><ImagePlus size={18}/> Add food photo (optional)<input type="file" accept="image/*" capture="environment" onChange={e=>{const f=e.target.files?.[0];if(f){setPhoto(f);setPhotoPreview(URL.createObjectURL(f))}}}/></label>
         {photoPreview && <img className="photo-preview" src={photoPreview} alt="Selected food"/>}
-        <p className="footnote">Photo is attached to your log; this MVP does not automatically recognise food or calculate calories from the image yet. Enter or adjust the estimate above.</p>
-        <button className="primary full" disabled={!selectedFood}>Save to diary</button>
+        <p className="footnote">Library matches fill calories and protein automatically. Estimates vary by portion and recipe. For a custom food, enter your best calorie estimate. Photos are saved with the diary entry but are not yet AI-analysed.</p>
+        {selectedFood && <div className="selected-food"><b>Estimated total</b><strong>{Math.round((Number(customCalories)||0)*(Math.max(0.25,Number(quantity)||1)))} kcal</strong></div>}
+        <button className="primary full" disabled={!selectedFood || customCalories === ""}>Save to diary</button>
       </form></div></div>}
 
     {profileOpen && <div className="modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)setProfileOpen(false)}}><div className="modal"><div className="modal-heading"><div><p className="eyebrow">PERSONAL SETTINGS</p><h2>Your body profile</h2></div><button className="icon-button" onClick={()=>setProfileOpen(false)}><X/></button></div>
