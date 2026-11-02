@@ -14,8 +14,9 @@ import {
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import { auth, db, storage, demoMode } from "./firebase";
 import { FOOD_LIBRARY, MEALS } from "./foodData";
+import { createMealPlan, MEAL_SLOTS } from "./mealPlanner";
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => { const d = new Date(); const offset = d.getTimezoneOffset(); return new Date(d.getTime() - offset * 60000).toISOString().slice(0, 10); };
 const money = n => `RM ${Number(n || 0).toFixed(2)}`;
 const localRead = (key, fallback) => {
   try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; }
@@ -29,10 +30,10 @@ function App() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [authError, setAuthError] = useState("");
-  const [page, setPage] = useState("Home");
+  const [page, setPage] = useState("Meal plan");
   const [profile, setProfile] = useState(() => localRead("mydiet_profile", {
     name:"", age:"", sex:"Male", height:"", weight:"", targetWeight:"",
-    activity:"Lightly active", budget:20, calorieTarget:0, proteinTarget:0
+    activity:"Lightly active", budget:20, calorieTarget:0, proteinTarget:0, foodStyle:"Mix", programDuration:30, programStartDate:today()
   }));
   const [logs, setLogs] = useState(() => localRead("mydiet_logs", []));
   const [weights, setWeights] = useState(() => localRead("mydiet_weights", []));
@@ -51,6 +52,8 @@ function App() {
   const [advisorQuestion, setAdvisorQuestion] = useState("");
   const [toast, setToast] = useState("");
   const [profileOpen, setProfileOpen] = useState(false);
+  const [planRotation, setPlanRotation] = useState(0);
+  const [reminders, setReminders] = useState(() => localRead("mydiet_reminders", { enabled:false, breakfastTime:"07:30", lunchTime:"12:30", teaTime:"16:00", dinnerTime:"19:30" }));
 
   useEffect(() => {
     if (demoMode) { setUser({ uid:"demo-user", email:"demo@mydiet.local" }); setAuthReady(true); return; }
@@ -73,6 +76,29 @@ function App() {
   useEffect(() => { if (demoMode) localWrite("mydiet_logs", logs); }, [logs]);
   useEffect(() => { if (demoMode) localWrite("mydiet_weights", weights); }, [weights]);
   useEffect(() => { localWrite("mydiet_profile", profile); }, [profile]);
+  useEffect(() => { localWrite("mydiet_reminders", reminders); }, [reminders]);
+
+  // Browser reminders work while this app is open. Background reminders need push messaging/service-worker setup.
+  useEffect(() => {
+    if (!reminders.enabled || !("Notification" in window) || Notification.permission !== "granted") return;
+    const check = () => {
+      const now = new Date();
+      const hhmm = `${String(now.getHours()).padStart(2,"0")}:${String(now.getMinutes()).padStart(2,"0")}`;
+      const day = today();
+      MEAL_SLOTS.forEach(slot => {
+        if (reminders[slot.timeKey] === hhmm) {
+          const key = `mydiet_notice_${day}_${slot.key}`;
+          if (!localStorage.getItem(key)) {
+            new Notification(`MyDiet: ${slot.label} time`, { body: "Check today's meal plan and enjoy your meal.", tag:key });
+            localStorage.setItem(key, "1");
+          }
+        }
+      });
+    };
+    check();
+    const timer = window.setInterval(check, 20000);
+    return () => window.clearInterval(timer);
+  }, [reminders]);
 
   function notify(msg) { setToast(msg); setTimeout(() => setToast(""), 3200); }
 
@@ -91,8 +117,14 @@ function App() {
     const bmr = profile.sex === "Male" ? 10*w + 6.25*(h*100) - 5*age + 5 : 10*w + 6.25*(h*100) - 5*age - 161;
     const factor = profile.activity === "Very active" ? 1.725 : profile.activity === "Moderately active" ? 1.55 : profile.activity === "Lightly active" ? 1.375 : 1.2;
     const maintenance = bmr * factor;
-    const target = Math.max(1200, Math.round((maintenance - 350) / 50) * 50);
-    const next = { ...profile, calorieTarget:target, proteinTarget:Math.round(w*1.4) };
+    const goalWeight = Number(profile.targetWeight || 0);
+    const hasWeightLossGoal = !goalWeight || goalWeight < w;
+    const deficit = hasWeightLossGoal ? 350 : 0;
+    const minimumGuide = profile.sex === "Male" ? 1500 : 1200;
+    const target = Math.max(minimumGuide, Math.round((maintenance - deficit) / 50) * 50);
+    const kgToLose = goalWeight > 0 && goalWeight < w ? Number((w - goalWeight).toFixed(1)) : 0;
+    const estimatedWeeks = kgToLose ? Math.ceil(kgToLose / 0.5) : 0;
+    const next = { ...profile, calorieTarget:target, proteinTarget:Math.round(w*1.4), kgToLose, estimatedWeeks, programDuration:Number(profile.programDuration || 30), programStartDate:profile.programStartDate || today() };
     setProfile(next);
     if (!demoMode && user) await setDoc(doc(db, "users", user.uid), { ...next, updatedAt:new Date().toISOString() }, { merge:true });
     notify("Profile saved and calorie target estimated.");
@@ -155,6 +187,39 @@ function App() {
     setProfile(p => ({...p, weight:String(val)})); setWeightInput(""); notify("Weight entry saved.");
   }
 
+  const programStart = new Date(`${profile.programStartDate || today()}T00:00:00`);
+  const todayDate = new Date(`${today()}T00:00:00`);
+  const programDay = Math.max(1, Math.floor((todayDate - programStart) / 86400000) + 1);
+  const programDuration = Number(profile.programDuration || 30);
+  const programComplete = programDay > programDuration;
+  const mealPlan = useMemo(() => createMealPlan(calorieTarget || 1800, profile.foodStyle || "Mix", programDay - 1, budget), [calorieTarget, profile.foodStyle, programDay, budget]);
+  const plannedCost = mealPlan.reduce((sum, item) => sum + item.cost, 0);
+  const plannedCalories = mealPlan.reduce((sum, item) => sum + item.calories, 0);
+
+  function restartProgram() {
+    const next = { ...profile, programStartDate: today() };
+    setProfile(next);
+    if (!demoMode && user) setDoc(doc(db, "users", user.uid), { programStartDate: today(), updatedAt:new Date().toISOString() }, { merge:true }).catch(err => notify(`Could not restart programme: ${err.message}`));
+    notify(`Your ${programDuration}-day meal programme has restarted.`);
+  }
+
+  async function enableReminders() {
+    if (!("Notification" in window)) { notify("This browser does not support notifications."); return; }
+    const permission = await Notification.requestPermission();
+    if (permission === "granted") { setReminders(r => ({ ...r, enabled:true })); notify("Meal reminders enabled while MyDiet is open."); }
+    else notify("Please allow notifications in your browser settings.");
+  }
+
+  async function logPlannedMeal(item) {
+    if (!user) { notify("Please sign in first."); return; }
+    const entry = { userId:user.uid, date:today(), mealType:item.key, foodId:`plan-${item.key.toLowerCase().replaceAll(" ","-")}`, foodName:item.name, portion:"Suggested meal", quantity:1, calories:item.calories, protein:item.protein, cost:item.cost, source:"meal-plan", photoUrl:"", createdAt:new Date().toISOString() };
+    try {
+      if (demoMode) setLogs(prev => [...prev, { ...entry, id:crypto.randomUUID() }]);
+      else await addDoc(collection(db, "food_logs"), entry);
+      notify(`${item.label} added to your food diary.`);
+    } catch (err) { notify(`Could not save meal: ${err.message}`); }
+  }
+
   const filteredFoods = FOOD_LIBRARY.filter(f =>
     (category === "All" || f.category === category) &&
     f.name.toLowerCase().includes(foodSearch.toLowerCase())
@@ -199,7 +264,7 @@ function App() {
   </div></div>;
 
   const nav = [
-    {name:"Home",icon:Home},{name:"Diary",icon:Utensils},{name:"Food library",icon:Apple},
+    {name:"Home",icon:Home},{name:"Meal plan",icon:ChefHat},{name:"Diary",icon:Utensils},{name:"Food library",icon:Apple},
     {name:"AI advisor",icon:Sparkles},{name:"Progress",icon:ChartNoAxesCombined}
   ];
 
@@ -218,7 +283,7 @@ function App() {
 
     <main className="main-content">
       <header className="topbar"><div><span className="eyebrow">MONDAY, YOUR HEALTH JOURNEY</span><h2>{page==="Home"?"Your daily overview":page}</h2></div>
-        <div className="top-actions"><span className="date-pill">{new Date().toLocaleDateString("en-MY",{day:"numeric",month:"short",year:"numeric"})}</span><button className="avatar" onClick={()=>setProfileOpen(true)}>{(profile.name||user?.email || "Guest").charAt(0).toUpperCase()}</button></div>
+        <div className="top-actions"><span className="date-pill">{new Date().toLocaleDateString("en-MY",{day:"numeric",month:"short",year:"numeric"})}</span><button className="avatar" onClick={()=>setProfileOpen(true)}>{(profile.name||user?.email||"M").charAt(0).toUpperCase()}</button></div>
       </header>
 
       {page==="Home" && <div className="page-stack">
@@ -236,6 +301,21 @@ function App() {
           <div className="panel advisor-card"><div className="advisor-icon"><Sparkles/></div><p className="eyebrow">A LITTLE GUIDANCE</p><h3>Make your next meal count.</h3><p className="muted">Get simple meal ideas based on your remaining calories and RM{budget} daily budget.</p><button className="primary full" onClick={()=>setPage("AI advisor")}>Ask MyDiet advisor <Sparkles size={16}/></button><div className="tip"><b>Remember</b><p>Try to include a protein source and vegetables in your main meals. You don't need to skip meals to lose weight.</p></div></div>
         </section>
         <section className="quick-actions"><button onClick={()=>setShowLog(true)}><Plus/>Log a meal</button><button onClick={()=>setPage("Food library")}><Search/>Find Malaysian food</button><button onClick={()=>setPage("Progress")}><TrendingDown/>Track weight</button></section>
+      </div>}
+
+      {page==="Meal plan" && <div className="page-stack">
+        <section className="welcome-row"><div><p className="eyebrow">YOUR DAILY FOOD GUIDE</p><h1>Today's meal plan<span>.</span></h1><p className="muted">Affordable halal-friendly mamak, Malay and home-style meals based on your calorie target.</p></div><div className="welcome-icon"><ChefHat size={38}/></div></section>
+        {!profile.calorieTarget && <div className="notice"><CircleHelp size={20}/><div><b>Set up your body profile first</b><p>Enter your age, height, current weight, target weight and activity level to estimate your daily calorie target.</p></div><button className="secondary" onClick={()=>setProfileOpen(true)}>Set up profile</button></div>}
+        <div className="program-banner"><div><span className="eyebrow">YOUR STRUCTURED WEIGHT-LOSS PROGRAMME</span><h2>Day {Math.min(programDay, programDuration)} of {programDuration}</h2><p>One daily menu, planned around affordable Malaysian mamak, Malay and home-cooked halal-friendly food.</p></div><div className="program-days"><b>{Math.max(0, programDuration - Math.min(programDay, programDuration))}</b><small>days left</small></div></div>
+        <div className="program-progress"><div style={{width:`${Math.min(100, programDay / programDuration * 100)}%`}}/></div>
+        <div className="plan-summary"><div><span>Daily calorie target</span><b>{calorieTarget || 1800} kcal</b></div><div><span>Today's assigned meals</span><b>{plannedCalories} kcal</b></div><div><span>Calories logged</span><b>{Math.round(totals.calories)} kcal</b></div></div>
+        <p className="plan-budget-line">Today's planned food cost: <b>{money(plannedCost)}</b> · Daily budget: <b>{money(budget)}</b>{plannedCost > budget ? " · This menu is above your budget estimate." : " · Within your budget estimate."}</p>
+        {profile.targetWeight && <p className="footnote">Goal: {profile.weight} kg → {profile.targetWeight} kg. Estimated timeline at a gradual average pace: about {profile.estimatedWeeks || 0} weeks. The {programDuration}-day programme is a first phase, not a promise that the full target will be reached in that time.</p>}
+        {programComplete && <div className="notice"><CircleHelp size={20}/><div><b>Your {programDuration}-day programme is complete.</b><p>Review your weight trend and restart a fresh programme if appropriate.</p></div><button className="secondary" onClick={restartProgram}>Start again</button></div>}
+        <div className="panel plan-intro"><div><h3>Today's assigned menu</h3><p className="muted">Follow the listed meals and portions as your daily plan. If an item is unavailable, choose a similar protein-and-vegetable option and log what you actually ate. Do not skip meals to compensate.</p></div><button className="secondary" onClick={restartProgram}>Restart programme</button></div>
+        <div className="plan-grid">{mealPlan.map(item=>{const logged=todayLogs.some(l=>l.mealType===item.key && l.source==="meal-plan");return <article className={`plan-card ${logged?"meal-completed":""}`} key={item.key}><div className="plan-card-top"><div><span className="food-category">{item.label} · {reminders[item.timeKey] || "Set time"}</span><h3>{item.name}</h3></div><div className="plan-calories"><b>{item.calories}</b><small>kcal</small></div></div><p className="plan-note">{item.note}</p><div className="plan-meta"><span><Flame size={14}/> {item.protein}g protein</span><span><Wallet size={14}/> {money(item.cost)}</span><span>Meal allowance: {item.targetCalories} kcal</span></div><button className={logged?"secondary full":"primary full"} disabled={logged} onClick={()=>logPlannedMeal(item)}>{logged?"Meal marked as eaten ✓":"I ate this meal · Mark complete"}</button></article>})}</div>
+        <p className="footnote">Meal calories and prices are estimates; restaurant portions, oil and recipes vary. MyDiet provides a structured guide, not a medical prescription. If you feel unwell, unusually hungry or weak, eat appropriately and seek qualified advice rather than forcing the calorie target. Confirm halal status with the restaurant.</p>
+        <div className="panel"><div className="panel-heading"><div><h3>Meal-time reminders</h3><p className="muted">Get a browser notification at your chosen meal times.</p></div><span className="tag">{reminders.enabled ? "Enabled" : "Not enabled"}</span></div><div className="reminder-times">{MEAL_SLOTS.map(slot=><label key={slot.key}>{slot.label}<input type="time" value={reminders[slot.timeKey]} onChange={e=>setReminders(r=>({...r,[slot.timeKey]:e.target.value}))}/></label>)}</div><div className="reminder-actions"><button className="primary" onClick={enableReminders}>Enable notifications</button><button className="secondary" onClick={()=>setReminders(r=>({...r,enabled:false}))}>Turn off</button></div><p className="footnote">Important: browser reminders run while MyDiet is open. For notifications when the browser is closed, we need to add Firebase Cloud Messaging (FCM), a service worker and push setup.</p></div>
       </div>}
 
       {page==="Diary" && <div className="page-stack"><div className="page-intro"><div><h1>Food diary</h1><p className="muted">See what you've eaten and what it adds up to.</p></div><button className="primary" onClick={()=>setShowLog(true)}><Plus size={17}/> Add food</button></div>
@@ -284,8 +364,10 @@ function App() {
         <div className="form-two"><label>Height (cm)<input type="number" value={profile.height} onChange={e=>setProfile({...profile,height:e.target.value})} placeholder="170"/></label><label>Current weight (kg)<input type="number" step="0.1" value={profile.weight} onChange={e=>setProfile({...profile,weight:e.target.value})} placeholder="85"/></label></div>
         <div className="form-two"><label>Target weight (kg)<input type="number" step="0.1" value={profile.targetWeight} onChange={e=>setProfile({...profile,targetWeight:e.target.value})} placeholder="75"/></label><label>Daily budget (RM)<input type="number" value={profile.budget} onChange={e=>setProfile({...profile,budget:Number(e.target.value)})}/></label></div>
         <label>Activity level<select value={profile.activity} onChange={e=>setProfile({...profile,activity:e.target.value})}><option>Sedentary</option><option>Lightly active</option><option>Moderately active</option><option>Very active</option></select></label>
+        <label>Preferred food style<select value={profile.foodStyle || "Mix"} onChange={e=>setProfile({...profile,foodStyle:e.target.value})}><option value="Mix">Mix of mamak, Malay & home food</option><option value="Mamak">Mamak food</option><option value="Malay">Malay food</option></select></label>
+        <label>Meal programme duration<select value={profile.programDuration || 30} onChange={e=>setProfile({...profile,programDuration:Number(e.target.value),programStartDate:today()})}><option value={30}>30 days (1 month)</option><option value={60}>60 days (2 months)</option></select><small className="muted">Changing duration restarts the programme from today.</small></label>
         <button className="primary full">Save profile & calculate targets</button>
-        {profile.calorieTarget>0 && <p className="success-note">Current estimated target: {profile.calorieTarget} kcal/day · Protein guide: {profile.proteinTarget}g/day</p>}
+        {profile.calorieTarget>0 && <p className="success-note">Daily calorie guide: {profile.calorieTarget} kcal · Protein guide: {profile.proteinTarget}g/day · Programme: {profile.programDuration || 30} days</p>}
       </form></div></div>}
     {toast && <div className="toast">{toast}</div>}
   </div>;
